@@ -27,5 +27,5 @@ Certifique-se de ter o **Java JDK** e o **Maven** instalados em sua máquina.
 
 1. **Clone o repositório:**
    ```bash
-   git clone [https://github.com/SEU-USUARIO/expense-tracker.git](https://github.com/SEU-USUARIO/expense-tracker.git)
+   git clone [https://github.com/Splashyy7/expense-tracker.git](https://github.com/SEU-USUARIO/expense-tracker.git)
    cd expense-tracker
