@@ -2,9 +2,14 @@ package org.example;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Collections;
 
 public class GerenciadorDespesas {
     private List<Despesa> despesas;
+
+    public List<Despesa> getDespesas() {
+        return Collections.unmodifiableList(despesas);
+    }
 
     public GerenciadorDespesas() {
         this.despesas = new ArrayList<>();
