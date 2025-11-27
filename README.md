@@ -15,7 +15,7 @@ Aplicação de console (CLI) desenvolvida em Java para gerenciamento de despesas
 
 ## 🛠️ Tecnologias Utilizadas
 
-* **Java 17+**: Linguagem principal.
+* **Java 19+**: Linguagem principal.
 * **Maven**: Gerenciamento de dependências e build.
 * **JUnit 5**: Framework de testes unitários.
 * **Java Streams API**: Para manipulação eficiente de coleções.
