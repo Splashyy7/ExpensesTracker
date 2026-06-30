@@ -36,3 +36,7 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### Dados locais ###
+despesas_export.csv
+.expenses-tracker/
