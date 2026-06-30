@@ -2,9 +2,13 @@ package org.example.service;
 
 import org.example.exception.ValidacaoException;
 import org.example.model.Despesa;
+import org.example.model.EstatisticasDespesas;
+import org.example.model.ResumoMensal;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -176,5 +180,62 @@ public class GerenciadorDespesas {
 
     public int quantidade() {
         return despesas.size();
+    }
+
+    public EstatisticasDespesas calcularEstatisticas() {
+        return calcularEstatisticas(despesas);
+    }
+
+    public EstatisticasDespesas calcularEstatisticas(LocalDate inicio, LocalDate fim) {
+        return calcularEstatisticas(filtrarPorPeriodo(inicio, fim));
+    }
+
+    public ResumoMensal gerarResumoMensal(YearMonth mes) {
+        LocalDate inicio = mes.atDay(1);
+        LocalDate fim = mes.atEndOfMonth();
+        List<Despesa> doMes = filtrarPorPeriodo(inicio, fim);
+
+        Map<String, BigDecimal> porCategoria = doMes.stream()
+                .collect(Collectors.groupingBy(
+                        Despesa::getCategoria,
+                        LinkedHashMap::new,
+                        Collectors.reducing(BigDecimal.ZERO, Despesa::getValor, BigDecimal::add)
+                ));
+
+        EstatisticasDespesas stats = calcularEstatisticas(doMes);
+        return new ResumoMensal(mes, doMes.size(), stats.total(), porCategoria, stats);
+    }
+
+    public int importarDespesas(List<Despesa> despesasImportadas) {
+        int count = 0;
+        for (Despesa d : despesasImportadas) {
+            adicionarDespesa(d.getDescricao(), d.getValor(), d.getCategoria(), d.getData());
+            count++;
+        }
+        return count;
+    }
+
+    public List<String> verificarLimitesCategoria(Map<String, BigDecimal> limites) {
+        List<String> alertas = new ArrayList<>();
+        for (Map.Entry<String, BigDecimal> entry : limites.entrySet()) {
+            BigDecimal gasto = calcularTotalPorCategoria(entry.getKey());
+            if (gasto.compareTo(entry.getValue()) > 0) {
+                BigDecimal excesso = gasto.subtract(entry.getValue());
+                alertas.add(String.format("%s: gasto %s excede limite %s (+%s)",
+                        entry.getKey(), gasto.toPlainString(), entry.getValue().toPlainString(),
+                        excesso.toPlainString()));
+            }
+        }
+        return alertas;
+    }
+
+    private static EstatisticasDespesas calcularEstatisticas(List<Despesa> lista) {
+        if (lista.isEmpty()) {
+            return EstatisticasDespesas.vazia();
+        }
+        BigDecimal total = lista.stream().map(Despesa::getValor).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal menor = lista.stream().map(Despesa::getValor).min(BigDecimal::compareTo).orElse(BigDecimal.ZERO);
+        BigDecimal maior = lista.stream().map(Despesa::getValor).max(BigDecimal::compareTo).orElse(BigDecimal.ZERO);
+        return EstatisticasDespesas.de(lista.size(), total, menor, maior);
     }
 }

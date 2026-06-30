@@ -1,0 +1,13 @@
+target/
+.idea/
+*.iml
+*.class
+.git/
+.gitignore
+
+### Dados locais ###
+despesas_export.csv
+.expenses-tracker/
+
+### Docker ###
+.env

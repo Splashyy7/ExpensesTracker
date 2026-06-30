@@ -2,6 +2,7 @@ package org.example.persistence;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import org.example.model.ConfiguracaoFinanceira;
 import org.example.model.Despesa;
 
 import java.io.IOException;
@@ -16,7 +17,9 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Persistência em arquivo JSON com escrita atômica para evitar corrupção de dados.
@@ -47,13 +50,13 @@ public class ArquivoJsonRepositorio implements RepositorioDespesas {
     }
 
     @Override
-    public void salvar(List<Despesa> despesas, long proximoId) throws IOException {
+    public void salvar(DadosPersistidos dados) throws IOException {
         Path diretorio = arquivo.getParent();
         if (diretorio != null) {
             Files.createDirectories(diretorio);
         }
 
-        ArquivoDto dto = new ArquivoDto(proximoId, despesas.stream().map(DespesaDto::de).toList());
+        ArquivoDto dto = ArquivoDto.de(dados);
         Path temporario = arquivo.resolveSibling(arquivo.getFileName() + ".tmp");
 
         try (Writer writer = Files.newBufferedWriter(temporario, StandardCharsets.UTF_8,
@@ -69,15 +72,15 @@ public class ArquivoJsonRepositorio implements RepositorioDespesas {
     }
 
     @Override
-    public DadosCarregados carregar() throws IOException {
+    public DadosPersistidos carregar() throws IOException {
         if (!Files.exists(arquivo)) {
-            return new DadosCarregados(List.of(), 1);
+            return new DadosPersistidos(List.of(), 1, new ConfiguracaoFinanceira());
         }
 
         try (Reader reader = Files.newBufferedReader(arquivo, StandardCharsets.UTF_8)) {
             ArquivoDto dto = gson.fromJson(reader, ArquivoDto.class);
             if (dto == null || dto.despesas == null) {
-                return new DadosCarregados(List.of(), 1);
+                return new DadosPersistidos(List.of(), 1, new ConfiguracaoFinanceira());
             }
 
             List<Despesa> despesas = new ArrayList<>();
@@ -85,12 +88,20 @@ public class ArquivoJsonRepositorio implements RepositorioDespesas {
                 despesas.add(item.paraDespesa());
             }
             long proximoId = dto.proximoId > 0 ? dto.proximoId : calcularProximoId(despesas);
-            return new DadosCarregados(despesas, proximoId);
+            ConfiguracaoFinanceira config = dto.configuracao != null
+                    ? dto.configuracao.paraConfiguracao()
+                    : new ConfiguracaoFinanceira();
+            return new DadosPersistidos(despesas, proximoId, config);
         }
     }
 
     public Path getArquivo() {
         return arquivo;
+    }
+
+    public Path getDiretorioBackup() {
+        Path parent = arquivo.getParent();
+        return parent != null ? parent.resolve("backups") : Path.of("backups");
     }
 
     private static long calcularProximoId(List<Despesa> despesas) {
@@ -100,7 +111,40 @@ public class ArquivoJsonRepositorio implements RepositorioDespesas {
                 .orElse(0) + 1;
     }
 
-    private record ArquivoDto(long proximoId, List<DespesaDto> despesas) {
+    private record ArquivoDto(long proximoId, List<DespesaDto> despesas, ConfigDto configuracao) {
+
+        static ArquivoDto de(DadosPersistidos dados) {
+            ConfigDto configDto = ConfigDto.de(dados.configuracao());
+            return new ArquivoDto(
+                    dados.proximoId(),
+                    dados.despesas().stream().map(DespesaDto::de).toList(),
+                    configDto
+            );
+        }
+    }
+
+    private record ConfigDto(String orcamentoMensalPadrao, Map<String, String> limitesPorCategoria) {
+
+        static ConfigDto de(ConfiguracaoFinanceira config) {
+            Map<String, String> limites = new HashMap<>();
+            config.getLimitesPorCategoria().forEach((k, v) -> limites.put(k, v.toPlainString()));
+            String orcamento = config.getOrcamentoMensalPadrao()
+                    .map(BigDecimal::toPlainString)
+                    .orElse(null);
+            return new ConfigDto(orcamento, limites);
+        }
+
+        ConfiguracaoFinanceira paraConfiguracao() {
+            ConfiguracaoFinanceira config = new ConfiguracaoFinanceira();
+            if (orcamentoMensalPadrao != null && !orcamentoMensalPadrao.isBlank()) {
+                config.setOrcamentoMensalPadrao(new BigDecimal(orcamentoMensalPadrao));
+            }
+            if (limitesPorCategoria != null) {
+                limitesPorCategoria.forEach((k, v) ->
+                        config.definirLimiteCategoria(k, new BigDecimal(v)));
+            }
+            return config;
+        }
     }
 
     private record DespesaDto(long id, String descricao, String valor, String categoria, String data) {
